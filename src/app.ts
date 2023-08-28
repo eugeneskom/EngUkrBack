@@ -32,8 +32,11 @@ if (cluster.isPrimary) {
   //create express app
   const app: express.Express = express();
   const router: express.Router = express.Router();
-
-  app.use(cors());
+  const corsOptions = {
+    origin: 'exp://192.168.0.106:19000', // Replace with your frontend's URL
+    methods: 'GET,POST', // Specify allowed HTTP methods
+  };
+  app.use(cors(corsOptions));
   app.use(express.json());
   app.use(router); // tell the app this is the router we are using
 
@@ -105,9 +108,6 @@ if (cluster.isPrimary) {
     }
   });
   
-  
-  
-
   router.get("/exercise_sentences", async (req, res) => {
     try {
       const results = await pool.query("SELECT * FROM exercise_sentences");
@@ -118,6 +118,31 @@ if (cluster.isPrimary) {
       res.status(500).json({ error: "An error occurred while fetching users" });
     }
   });
+
+  router.get("/vocabulary_categories", async (req, res) => {
+    try {
+      const results = await pool.query("SELECT * FROM vocabulary_categories");
+      // console.log("results", results);
+      res.json(results.rows);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "An error occurred while fetching users" });
+    }
+  });
+
+  router.get('/getWordsByCategory', async (req, res) => {
+    try {
+      const { category } = req.query;
+      const query = 'SELECT * FROM vocabulary WHERE category = $1';
+      const values = [category];
+      const results = await pool.query(query, values);
+      res.json(results.rows);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'An error occurred while fetching words' });
+    }
+  });
+
 
   router.get("/healthcheck", healthcheck);
   // sampleController routes
