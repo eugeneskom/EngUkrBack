@@ -3,14 +3,11 @@ import express from "express";
 import cluster from "cluster";
 import { logger } from "./utils/logger";
 import { cpus } from "os";
-//import controllers
 import { healthcheck } from "./controllers/controller-healthcheck";
 import { getTime, sampleTransaction } from "./controllers/controller-sample";
 import pool from "./db";
-
 import bcrypt from "bcrypt";
 import cors from "cors";
-// const cors = require("cors"); // If you haven't installed it yet, run `npm install cors`
 
 // const bcrypt = require('bcrypt');
 const numCPUs = cpus().length;
@@ -43,8 +40,9 @@ if (cluster.isPrimary) {
   //healthcheck routes
   router.get("/", async (req, res) => {
     try {
-      const results = await pool.query("SELECT * FROM words");
-      console.log("results", results);
+      // const results = await pool.query("SELECT * FROM words");
+      // console.log("results", results);
+
       // res.json(results.rows);
     } catch (err) {
       console.error(err);
@@ -119,7 +117,7 @@ if (cluster.isPrimary) {
     }
   });
 
-  router.get("/vocabulary_categories", async (req, res) => {
+  router.get("/vocabularyCategories", async (req, res) => {
     try {
       const results = await pool.query("SELECT * FROM vocabulary_categories");
       // console.log("results", results);
@@ -142,6 +140,66 @@ if (cluster.isPrimary) {
       res.status(500).json({ error: 'An error occurred while fetching words' });
     }
   });
+
+  router.post('/updateUserVocabulary', async (req, res) => {
+    try {
+      const { userId, wordsToAdd, wordsToRemove } = req.body;
+  console.log("updateUserVocabulary: ",userId, wordsToAdd, wordsToRemove)
+      // Check if user's table exists
+      const tableExistsQuery = `
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.tables
+          WHERE table_name = 'user_${userId}_vocabulary'
+        );
+      `;
+  
+      const { rows } = await pool.query(tableExistsQuery);
+  
+      if (!rows[0].exists) {
+        // Create user's table
+        const createUserTableQuery = `
+          CREATE TABLE user_${userId}_vocabulary (
+            user_word_id SERIAL PRIMARY KEY,
+            word_id INT,
+            learned BOOLEAN
+          );
+        `;
+  
+        await pool.query(createUserTableQuery);
+      }
+  
+      // Insert words into user's table
+      if (wordsToAdd && wordsToAdd.length > 0) {
+        const insertWordsQuery = `
+          INSERT INTO user_${userId}_vocabulary (word_id, learned)
+          VALUES ($1, $2);
+        `;
+  
+        for (const wordId of wordsToAdd) {
+          await pool.query(insertWordsQuery, [wordId, false]);
+        }
+      }
+  
+      // Remove words from user's table
+      if (wordsToRemove && wordsToRemove.length > 0) {
+        const removeWordsQuery = `
+          DELETE FROM user_${userId}_vocabulary
+          WHERE word_id = $1;
+        `;
+  
+        for (const wordId of wordsToRemove) {
+          await pool.query(removeWordsQuery, [wordId]);
+        }
+      }
+  
+      res.json({ success: true, message: 'User vocabulary updated successfully' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'An error occurred while updating user vocabulary' });
+    }
+  });
+  
 
 
   router.get("/healthcheck", healthcheck);

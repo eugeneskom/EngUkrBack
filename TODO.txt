@@ -1,0 +1,3 @@
+  1. To be able to get users words need to send user id from the front, for that I need to save user data
+to the local storage so then I can use it in API calls to retrieve required data.
+   a. for now I will just hard code user id to test new functionality.
